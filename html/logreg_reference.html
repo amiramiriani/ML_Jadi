@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Logistic Regression — Solvers & Regularization</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --surface2: #22263a;
+    --border:   rgba(255,255,255,0.08);
+    --border2:  rgba(255,255,255,0.14);
+    --text:     #e8eaf0;
+    --muted:    #7e8299;
+    --accent:   #7c6af7;
+    --accent-d: #5b4fd4;
+    --l1:       #f0855a;
+    --l2:       #4db8a0;
+    --mono:     'JetBrains Mono', monospace;
+    --sans:     'Inter', sans-serif;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 32px 24px 64px;
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  /* ── Header ── */
+  .header {
+    border-left: 3px solid var(--accent);
+    padding-left: 16px;
+    margin-bottom: 36px;
+  }
+  .header h1 {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--text);
+    letter-spacing: -0.3px;
+  }
+  .header p {
+    color: var(--muted);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+  .header .import-line {
+    display: inline-block;
+    margin-top: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: #a5b4fc;
+  }
+
+  /* ── Section labels ── */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin: 36px 0 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Solver grid ── */
+  .solver-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 10px;
+  }
+
+  .solver-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    transition: border-color 0.15s;
+  }
+  .solver-card:hover { border-color: var(--border2); }
+
+  .solver-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .solver-desc {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.55;
+    margin-bottom: 10px;
+  }
+
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  .tag-size  { background: rgba(124,106,247,0.12); color: #a5b4fc; border-color: rgba(124,106,247,0.25); }
+  .tag-l1    { background: rgba(240,133,90,0.12);  color: #f0855a; border-color: rgba(240,133,90,0.25); }
+  .tag-l2    { background: rgba(77,184,160,0.12);  color: #4db8a0; border-color: rgba(77,184,160,0.25); }
+  .tag-en    { background: rgba(250,199,117,0.12); color: #fac775; border-color: rgba(250,199,117,0.25); }
+  .tag-none  { background: rgba(126,130,153,0.12); color: #a0a3b1; border-color: rgba(126,130,153,0.25); }
+  .tag-multi { background: rgba(96,165,250,0.12);  color: #60a5fa; border-color: rgba(96,165,250,0.25); }
+
+  /* ── Penalty table ── */
+  .penalty-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .penalty-card {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .penalty-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+  }
+  .penalty-card.l1::before { background: var(--l1); }
+  .penalty-card.l2::before { background: var(--l2); }
+
+  .penalty-label {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    margin-bottom: 2px;
+  }
+  .penalty-card.l1 .penalty-label { color: var(--l1); }
+  .penalty-card.l2 .penalty-label { color: var(--l2); }
+
+  .penalty-alias {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .penalty-tagline {
+    font-size: 13px;
+    color: var(--text);
+    margin-bottom: 12px;
+    line-height: 1.5;
+  }
+  .penalty-formula {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .penalty-formula span { color: var(--text); }
+  .penalty-when {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .penalty-when strong { color: var(--text); font-weight: 500; }
+
+  /* ── C parameter ── */
+  .c-visual {
+    background: var(--surface);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .c-scale {
+    display: flex;
+    align-items: stretch;
+    height: 36px;
+    border-radius: 6px;
+    overflow: hidden;
+    margin: 14px 0 8px;
+    gap: 1px;
+  }
+  .c-seg {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: rgba(255,255,255,0.85);
+  }
+  .c-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .c-rule-row {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+  }
+  .c-rule {
+    flex: 1;
+    background: var(--surface2);
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .c-rule .val { font-family: var(--mono); color: var(--accent); font-size: 13px; font-weight: 500; display: block; margin-bottom: 3px; }
+  .c-rule .desc { color: var(--muted); }
+
+  /* ── New API table ── */
+  .api-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+  .api-table th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border2);
+  }
+  .api-table td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .api-table tr:last-child td { border-bottom: none; }
+  .api-table tr:hover td { background: var(--surface2); }
+
+  .old { color: #f87171; text-decoration: line-through; opacity: 0.7; }
+  .new { color: #86efac; }
+  .arrow { color: var(--muted); padding: 0 4px; }
+
+  /* ── Code block ── */
+  .code-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.75;
+    overflow-x: auto;
+    white-space: pre;
+  }
+  .c-kw   { color: #c084fc; }
+  .c-fn   { color: #60a5fa; }
+  .c-str  { color: #86efac; }
+  .c-num  { color: #fb923c; }
+  .c-cmt  { color: #4b5563; font-style: italic; }
+  .c-cls  { color: #fbbf24; }
+  .c-var  { color: var(--text); }
+
+  /* ── Footer ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--mono);
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>LogisticRegression — Solvers &amp; Regularization</h1>
+  <p>Quick reference for sklearn 1.8+ — penalty API, solvers, and C tuning</p>
+  <span class="import-line">from sklearn.linear_model import LogisticRegression</span>
+</div>
+
+<!-- ── Solvers ── -->
+<div class="section-label">Solvers</div>
+<div class="solver-grid">
+
+  <div class="solver-card">
+    <div class="solver-name">liblinear</div>
+    <div class="solver-desc">Fast on small datasets. Only OvR for multiclass — not multinomial.</div>
+    <div class="tags">
+      <span class="tag tag-size">small data</span>
+      <span class="tag tag-l1">L1</span>
+      <span class="tag tag-l2">L2</span>
+    </div>
+  </div>
+
+  <div class="solver-card">
+    <div class="solver-name">lbfgs</div>
+    <div class="solver-desc">Sklearn default. Reliable all-rounder, handles multinomial natively. No L1.</div>
+    <div class="tags">
+      <span class="tag tag-size">small–med</span>
+      <span class="tag tag-l2">L2</span>
+      <span class="tag tag-none">None</span>
+      <span class="tag tag-multi">multinomial</span>
+    </div>
+  </div>
+
+  <div class="solver-card">
+    <div class="solver-name">saga</div>
+    <div class="solver-desc">Most flexible. Supports every penalty type. Best for large datasets.</div>
+    <div class="tags">
+      <span class="tag tag-size">large data</span>
+      <span class="tag tag-l1">L1</span>
+      <span class="tag tag-l2">L2</span>
+      <span class="tag tag-en">ElasticNet</span>
+      <span class="tag tag-none">None</span>
+      <span class="tag tag-multi">multinomial</span>
+    </div>
+  </div>
+
+  <div class="solver-card">
+    <div class="solver-name">sag</div>
+    <div class="solver-desc">Like saga but no L1 or ElasticNet. Faster than lbfgs on large data.</div>
+    <div class="tags">
+      <span class="tag tag-size">large data</span>
+      <span class="tag tag-l2">L2</span>
+      <span class="tag tag-none">None</span>
+      <span class="tag tag-multi">multinomial</span>
+    </div>
+  </div>
+
+  <div class="solver-card">
+    <div class="solver-name">newton-cg</div>
+    <div class="solver-desc">Handles multinomial natively. Slower on large datasets — prefer lbfgs.</div>
+    <div class="tags">
+      <span class="tag tag-size">medium</span>
+      <span class="tag tag-l2">L2</span>
+      <span class="tag tag-none">None</span>
+      <span class="tag tag-multi">multinomial</span>
+    </div>
+  </div>
+
+  <div class="solver-card">
+    <div class="solver-name">newton-cholesky</div>
+    <div class="solver-desc">Best when features &gt;&gt; samples. Binary classification or OvR only.</div>
+    <div class="tags">
+      <span class="tag tag-size">wide data</span>
+      <span class="tag tag-l2">L2</span>
+      <span class="tag tag-none">None</span>
+    </div>
+  </div>
+
+</div>
+
+<!-- ── Penalty ── -->
+<div class="section-label">Regularization — L1 vs L2</div>
+<div class="penalty-grid">
+
+  <div class="penalty-card l1">
+    <div class="penalty-label">L1</div>
+    <div class="penalty-alias">Lasso &nbsp;·&nbsp; l1_ratio=1</div>
+    <div class="penalty-tagline">Cuts weak features to <strong>exactly zero</strong> — automatic feature selection.</div>
+    <div class="penalty-formula">penalty = (1/C) · <span>Σ |wᵢ|</span></div>
+    <div class="penalty-when">
+      <strong>Use when:</strong> many irrelevant features, high-dimensional data, you want a sparse model.
+    </div>
+  </div>
+
+  <div class="penalty-card l2">
+    <div class="penalty-label">L2</div>
+    <div class="penalty-alias">Ridge &nbsp;·&nbsp; l1_ratio=0 (default)</div>
+    <div class="penalty-tagline">Shrinks all coefficients toward zero — no feature is ever fully removed.</div>
+    <div class="penalty-formula">penalty = (1/C) · <span>Σ wᵢ²</span></div>
+    <div class="penalty-when">
+      <strong>Use when:</strong> all features contribute something, you want stable predictions, multicollinearity present.
+    </div>
+  </div>
+
+</div>
+
+<!-- ── C parameter ── -->
+<div class="section-label">C — Regularization strength</div>
+<div class="c-visual">
+  <div style="font-size:12px;color:var(--muted);">C is the <em>inverse</em> of regularization — smaller C = stronger penalty.</div>
+  <div class="c-scale">
+    <div class="c-seg" style="background:#1e2a45;flex:0.7">0.001</div>
+    <div class="c-seg" style="background:#263352">0.01</div>
+    <div class="c-seg" style="background:#2e3d62">0.1</div>
+    <div class="c-seg" style="background:#3d4f7a;border:2px solid rgba(124,106,247,0.6)">1</div>
+    <div class="c-seg" style="background:#4e6394">10</div>
+    <div class="c-seg" style="background:#5e77ad">100</div>
+    <div class="c-seg" style="background:#7090cc;flex:0.7">1000</div>
+  </div>
+  <div class="c-labels">
+    <span>← strong regularization</span>
+    <span>sklearn default ↑</span>
+    <span>weak regularization →</span>
+  </div>
+  <div class="c-rule-row">
+    <div class="c-rule">
+      <span class="val">C = 0.001</span>
+      <span class="desc">Very strong — most coefficients near zero. Risk of underfitting. Your current setting.</span>
+    </div>
+    <div class="c-rule">
+      <span class="val">C = 1</span>
+      <span class="desc">Balanced default. Start here and tune outward with cross-validation.</span>
+    </div>
+    <div class="c-rule">
+      <span class="val">C = 100</span>
+      <span class="desc">Near no regularization. Model learns complex patterns — risk of overfitting.</span>
+    </div>
+  </div>
+</div>
+
+
